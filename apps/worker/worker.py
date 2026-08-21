@@ -6,6 +6,7 @@ import requests
 from dotenv import load_dotenv
 
 from captioning import write_word_pop_ass, transliterate_word
+from smart_crop import build_crop_plan
 
 load_dotenv()
 
@@ -104,10 +105,19 @@ Transcript:\n{transcript.get('text', '')[:80000]}
     return sorted(clips, key=lambda x: float(x.get('score', 0)), reverse=True)[:12]
 
 
-def render(video: Path, out: Path, start: float, end: float, caption_file: Path) -> None:
+def clip_focus_x(plan: dict[str, Any], start: float, end: float) -> float:
+    values = [float(s['focusX']) for s in plan.get('segments', []) if float(s.get('end', 0)) >= start and float(s.get('start', 0)) <= end]
+    if not values:
+        return 0.5
+    return max(0.05, min(0.95, sum(values) / len(values)))
+
+
+def render(video: Path, out: Path, start: float, end: float, caption_file: Path, focus_x: float = 0.5) -> None:
     duration = max(1.0, end - start)
     safe_ass = str(caption_file.resolve()).replace('\\', '/').replace(':', '\\:')
-    vf = f"scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,ass='{safe_ass}'"
+    # A robust baseline: letterbox-free vertical crop with the crop center biased toward the detected speaker.
+    focus_expr = f"{focus_x:.4f}"
+    vf = f"scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:({focus_expr}*iw)-540:0,ass='{safe_ass}'"
     run([
         'ffmpeg', '-y', '-ss', f'{start:.3f}', '-i', str(video), '-t', f'{duration:.3f}',
         '-vf', vf, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20',
@@ -125,13 +135,16 @@ def process(url: str, outdir: str = './output') -> dict[str, Any]:
         audio(video, wav)
         transcript = transcribe(wav)
         clips = moments(transcript)
+        crop_plan = build_crop_plan(video)
+        (root / 'crop-plan.json').write_text(json.dumps(crop_plan, indent=2), encoding='utf-8')
         rendered: list[dict[str, Any]] = []
         for i, clip in enumerate(clips[:8], 1):
             start, end = float(clip['start']), float(clip['end'])
             caption_path = root / f'clip-{i:02d}.ass'
             write_word_pop_ass(transcript['words'], start, end, str(transcript.get('language', '')), caption_path)
+            focus_x = clip_focus_x(crop_plan, start, end)
             target = root / f'clip-{i:02d}.mp4'
-            render(video, target, start, end, caption_path)
+            render(video, target, start, end, caption_path, focus_x)
             rendered.append({
                 **clip,
                 'file': str(target),
@@ -139,11 +152,13 @@ def process(url: str, outdir: str = './output') -> dict[str, Any]:
                 'captionStyle': 'Word Pop',
                 'captionLanguage': transcript.get('language'),
                 'hookTransliterated': transliterate_word(str(clip.get('hook', '')), str(transcript.get('language', ''))),
+                'framing': {'mode': crop_plan.get('mode', 'center'), 'focusX': focus_x},
             })
         manifest = {
             'source': url,
             'language': transcript.get('language'),
             'transcript': transcript,
+            'cropPlan': crop_plan,
             'clips': rendered,
             'model': OPENROUTER_MODEL,
         }
