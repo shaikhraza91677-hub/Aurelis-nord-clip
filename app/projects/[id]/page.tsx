@@ -1,27 +1,73 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useParams } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import type { Project } from '@/lib/projects';
 
-const demo = [
-  { title:'The insight everyone misses', score:96, time:'00:42 – 01:31', reason:'Strong hook + complete payoff', tags:['Hook','Insight'] },
-  { title:'A brutally honest answer', score:92, time:'12:08 – 12:57', reason:'High emotional tension', tags:['Emotion','Punchline'] },
-  { title:'This changes the whole story', score:88, time:'24:16 – 25:04', reason:'Standalone educational moment', tags:['Education','Story'] },
-  { title:'The unexpected turning point', score:84, time:'37:20 – 38:11', reason:'Curiosity gap + payoff', tags:['Curiosity'] },
-  { title:'One sentence worth clipping', score:81, time:'49:02 – 49:44', reason:'Short, quotable and clear', tags:['Quote'] },
-  { title:'The final takeaway', score:78, time:'58:10 – 59:06', reason:'Useful conclusion', tags:['Takeaway'] },
-];
+const categories = ['All', 'Hook', 'Insight', 'Emotion', 'Education', 'Curiosity', 'Quote', 'Story', 'Humor'];
 
-export default function Project() {
-  const params=useSearchParams();
-  const source=params.get('source') || 'Video source';
-  const [filter,setFilter]=useState('All');
-  const [style,setStyle]=useState('Word Pop');
-  const filtered=useMemo(()=>filter==='All'?demo:demo.filter(c=>c.tags.includes(filter)),[filter]);
-  return <main className="shell"><nav className="nav"><div className="brand">AURELIS <span>NORD</span></div><div className="navlinks"><span>Project</span><span>Brand</span><span>Exports</span></div><button className="secondary">New project</button></nav>
-    <section className="dashboard"><div className="dashhead"><div><div className="muted" style={{fontSize:12,marginBottom:8}}>PROJECT / AI ANALYSIS</div><h2>Your clips</h2><div className="muted" style={{marginTop:8,fontSize:13}}>{source}</div></div><button className="primary">Render selected</button></div>
-      <div className="toolbar"><select className="filter" value={filter} onChange={e=>setFilter(e.target.value)}><option>All</option><option>Hook</option><option>Insight</option><option>Emotion</option><option>Education</option><option>Curiosity</option><option>Quote</option></select><select className="filter" value={style} onChange={e=>setStyle(e.target.value)}><option>Word Pop</option><option>Highlight</option><option>Fade</option><option>Bounce</option></select><button className="filter">9:16</button><button className="filter">Auto crop</button><button className="filter">Captions: ON</button></div>
-      <div className="clips">{filtered.map(c=><article className="clip" key={c.title}><div className="preview"><span className="score">{c.score}</span></div><div className="clipbody"><h3>{c.title}</h3><p>{c.time} · {c.reason}</p><div className="actions"><button className="secondary">Preview</button><button className="secondary">Render</button></div></div></article>)}</div>
+function timecode(seconds: number) {
+  const total = Math.max(0, Math.round(seconds));
+  const m = Math.floor(total / 60).toString().padStart(2, '0');
+  const s = (total % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+export default function ProjectPage() {
+  const params = useParams<{ id: string }>();
+  const [project, setProject] = useState<Project | null>(null);
+  const [filter, setFilter] = useState('All');
+  const [style, setStyle] = useState('Word Pop');
+  const [selected, setSelected] = useState<string[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      const response = await fetch(`/api/projects/${params.id}`, { cache: 'no-store' });
+      if (response.ok && !cancelled) setProject(await response.json());
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [params.id]);
+
+  const filtered = useMemo(() => project?.clips.filter(c => filter === 'All' || c.category === filter) ?? [], [project, filter]);
+
+  if (!project) return <main className="shell"><div className="dashboard"><div className="loading">Loading project…</div></div></main>;
+
+  return <main className="shell">
+    <nav className="nav"><div className="brand">AURELIS <span>NORD</span></div><div className="navlinks"><span>Project</span><span>Brand</span><span>Exports</span></div><button className="secondary" onClick={() => window.location.href = '/'}>New project</button></nav>
+    <section className="dashboard">
+      <div className="dashhead">
+        <div>
+          <div className="muted" style={{fontSize:12, marginBottom:8}}>PROJECT / {project.status.toUpperCase()}</div>
+          <h2>Your clips</h2>
+          <div className="muted" style={{marginTop:8,fontSize:13, maxWidth:760, overflow:'hidden', textOverflow:'ellipsis'}}>{project.sourceUrl}</div>
+          <div className="muted" style={{marginTop:6,fontSize:12}}>Language: {project.language || 'detecting'} · {project.clips.length} candidates · Model: {project.model || '—'}</div>
+        </div>
+        <button className="primary" disabled={!selected.length}>{selected.length ? `Render ${selected.length}` : 'Select clips to render'}</button>
+      </div>
+
+      {project.status === 'failed' && <div className="error">{project.error}</div>}
+      {project.status === 'completed' && <div className="success">Analysis complete. Aurelis ranked the strongest moments by hook, payoff, context, pacing and shareability.</div>}
+
+      <div className="toolbar">
+        <select className="filter" value={filter} onChange={e=>setFilter(e.target.value)}>{categories.map(x=><option key={x}>{x}</option>)}</select>
+        <select className="filter" value={style} onChange={e=>setStyle(e.target.value)}><option>Word Pop</option><option>Highlight</option><option>Fade</option><option>Bounce</option></select>
+        <button className="filter">9:16</button><button className="filter">Auto crop</button><button className="filter">Captions: ON</button>
+      </div>
+
+      <div className="clips">
+        {filtered.length === 0 && <div className="empty">No clips match this filter.</div>}
+        {filtered.map((c, index) => {
+          const checked = selected.includes(c.id);
+          return <article className={`clip ${checked ? 'selected' : ''}`} key={c.id}>
+            <div className="preview"><span className="score">{c.score}</span><span className="previewlabel">9:16 · {style}</span></div>
+            <div className="clipbody"><div className="clipmeta">#{index + 1} · {c.category} · {timecode(c.start)}–{timecode(c.end)}</div><h3>{c.title}</h3><p>{c.reason}</p><p className="hook">“{c.hook}”</p>
+              <div className="actions"><button className="secondary" onClick={() => setSelected(v => v.includes(c.id) ? v.filter(id => id !== c.id) : [...v, c.id])}>{checked ? 'Selected' : 'Select'}</button>{c.file && <a className="secondary" href={`/api/projects/${params.id}/clips/${encodeURIComponent(c.id)}`}>Preview / Download</a>}</div>
+            </div>
+          </article>;
+        })}
+      </div>
     </section>
   </main>;
 }
