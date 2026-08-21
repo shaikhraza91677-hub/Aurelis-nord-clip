@@ -9,12 +9,12 @@ from render import render_clip
 from supercut import create_supercut
 
 
-def analyze_url(url: str, out: str) -> dict:
-    return process_url(url, out)
+def analyze_url(url: str, out: str, prompt: str = '') -> dict:
+    return process_url(url, out, prompt)
 
 
-def analyze_file(path: str, out: str) -> dict:
-    return process_file(path, out)
+def analyze_file(path: str, out: str, prompt: str = '') -> dict:
+    return process_file(path, out, prompt)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -42,11 +42,11 @@ class Handler(BaseHTTPRequestHandler):
             n = int(self.headers.get('Content-Length', '0'))
             body = json.loads(self.rfile.read(n) or b'{}')
             if self.path == '/process':
-                job_id = submit('analyze-url', lambda: analyze_url(body['url'], body.get('out', './output')))
+                job_id = submit('analyze-url', lambda: analyze_url(body['url'], body.get('out', './output'), body.get('prompt', '')))
                 self._json(202, {'jobId': job_id, 'status': 'queued'})
                 return
             if self.path == '/process-file':
-                job_id = submit('analyze-file', lambda: analyze_file(body['path'], body.get('out', './output')))
+                job_id = submit('analyze-file', lambda: analyze_file(body['path'], body.get('out', './output'), body.get('prompt', '')))
                 self._json(202, {'jobId': job_id, 'status': 'queued'})
                 return
             if self.path == '/render-clip':
