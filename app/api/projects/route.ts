@@ -8,30 +8,6 @@ function workerUrl() {
   return process.env.WORKER_URL || 'http://localhost:8080';
 }
 
-function hydrate(result: any, id: string, sourceUrl: string, createdAt: string) {
-  const clips: Clip[] = (result?.clips || []).map((clip: any, index: number) => ({
-    id: `${id}-${index + 1}`,
-    title: clip.title || `Aurelis clip ${index + 1}`,
-    hook: clip.hookTransliterated || clip.hook || '',
-    reason: clip.reason || '',
-    description: clip.description || '',
-    hashtags: Array.isArray(clip.hashtags) ? clip.hashtags : [],
-    category: clip.category || 'Other',
-    score: Math.max(0, Math.min(100, Math.round(Number(clip.score || 0)))),
-    start: Number(clip.start || 0),
-    end: Number(clip.end || 0),
-    file: clip.file,
-    captionTimeline: clip.captionTimeline,
-    language: result?.language,
-    framing: clip.framing,
-  }));
-  return {
-    id, sourceUrl, createdAt, status: 'completed' as const,
-    progress: 100, stage: 'Complete', language: result?.language, model: result?.model,
-    duration: Number(result?.duration || 0) || undefined, clips,
-  };
-}
-
 export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: 'Enter a valid video URL.' }, { status: 400 });
@@ -60,5 +36,3 @@ export async function POST(req: Request) {
 export async function GET() {
   return NextResponse.json([...projects.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 50));
 }
-
-export { hydrate };
