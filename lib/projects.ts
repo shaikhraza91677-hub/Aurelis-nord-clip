@@ -14,46 +14,22 @@ export type ClipConfig = {
 };
 
 export const defaultClipConfig: ClipConfig = {
-  captionStyle: 'Word Pop',
-  captionLanguage: 'auto',
-  aspectRatio: '9:16',
-  framing: 'smart',
-  captionPosition: 'bottom',
-  captionSize: 'medium',
-  captionColor: '#FFFFFF',
-  showCaptions: true,
+  captionStyle: 'Word Pop', captionLanguage: 'auto', aspectRatio: '9:16', framing: 'smart',
+  captionPosition: 'bottom', captionSize: 'medium', captionColor: '#FFFFFF', showCaptions: true,
 };
 
 export type Clip = {
-  id: string;
-  title: string;
-  hook: string;
-  reason: string;
-  category: ClipCategory | string;
-  score: number;
-  start: number;
-  end: number;
-  file?: string;
-  captionTimeline?: string;
-  language?: string;
-  framing?: { mode: string; focusX?: number };
-  config?: ClipConfig;
+  id: string; title: string; hook: string; reason: string; category: ClipCategory | string;
+  score: number; start: number; end: number; file?: string; captionTimeline?: string;
+  language?: string; framing?: { mode: string; focusX?: number }; config?: ClipConfig;
 };
 
 export type Project = {
-  id: string;
-  sourceUrl: string;
-  status: 'queued' | 'processing' | 'completed' | 'failed';
-  createdAt: string;
-  language?: string;
-  model?: string;
-  error?: string;
-  clips: Clip[];
+  id: string; sourceUrl: string; sourcePath?: string;
+  status: 'queued' | 'processing' | 'completed' | 'failed'; createdAt: string;
+  language?: string; model?: string; error?: string; clips: Clip[];
 };
 
-declare global {
-  var aurelisProjects: Map<string, Project> | undefined;
-}
-
+declare global { var aurelisProjects: Map<string, Project> | undefined; }
 export const projects = globalThis.aurelisProjects ?? new Map<string, Project>();
 if (!globalThis.aurelisProjects) globalThis.aurelisProjects = projects;
