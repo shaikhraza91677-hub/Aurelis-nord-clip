@@ -1,20 +1,13 @@
-import contextvars
-import json
-import os
-import threading
-import uuid
+import contextvars,json,os,threading,uuid
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
-from typing import Any, Callable
-_MAX_WORKERS=max(1,int(os.getenv('WORKER_MAX_CONCURRENCY','1')))
-_POOL=ThreadPoolExecutor(max_workers=_MAX_WORKERS,thread_name_prefix='aurelis-job')
-_LOCK=threading.RLock();_JOBS={};_CURRENT_JOB:contextvars.ContextVar[str|None]=contextvars.ContextVar('aurelis_job',default=None)
-_REDIS=None;_REDIS_ENABLED=False
+from datetime import datetime,timezone
+from typing import Any,Callable
+_MAX_WORKERS=max(1,int(os.getenv('WORKER_MAX_CONCURRENCY','1')));_POOL=ThreadPoolExecutor(max_workers=_MAX_WORKERS,thread_name_prefix='aurelis-job');_LOCK=threading.RLock();_JOBS={};_CURRENT_JOB:contextvars.ContextVar[str|None]=contextvars.ContextVar('aurelis_job',default=None);_REDIS=None;_REDIS_ENABLED=False
 try:
  import redis
- if os.getenv('REDIS_URL'):
-  _REDIS=redis.Redis.from_url(os.getenv('REDIS_URL'),decode_responses=True);_REDIS.ping();_REDIS_ENABLED=True
+ if os.getenv('REDIS_URL'):_REDIS=redis.Redis.from_url(os.getenv('REDIS_URL'),decode_responses=True);_REDIS.ping();_REDIS_ENABLED=True
 except Exception:_REDIS=None;_REDIS_ENABLED=False
+
 def _now():return datetime.now(timezone.utc).isoformat()
 def _key(job_id):return f'aurelis:job:{job_id}'
 def _persist(job):
@@ -22,8 +15,7 @@ def _persist(job):
  if _REDIS_ENABLED:_REDIS.set(_key(job['id']),json.dumps(job,ensure_ascii=False),ex=7*86400)
 def submit(kind,payload,local_fn:Callable[[],dict[str,Any]]|None=None):
  job_id=str(uuid.uuid4());job={'id':job_id,'kind':kind,'payload':payload,'status':'queued','progress':0,'stage':'Queued','createdAt':_now(),'updatedAt':_now(),'result':None,'error':None};_persist(job)
- if _REDIS_ENABLED:
-  _REDIS.rpush('aurelis:queue',job_id);_REDIS.lpush('aurelis:recent',job_id);_REDIS.ltrim('aurelis:recent',0,199)
+ if _REDIS_ENABLED:_REDIS.rpush('aurelis:queue',job_id);_REDIS.lpush('aurelis:recent',job_id);_REDIS.ltrim('aurelis:recent',0,199)
  elif local_fn:_POOL.submit(_run_local,job_id,local_fn)
  else:raise RuntimeError('Redis queue unavailable and no local runner provided')
  return job_id
@@ -37,10 +29,23 @@ def _handler(kind,payload):
  if kind=='supercut':
   from supercut import create_supercut;return create_supercut(payload.get('files',[]),payload['out'],payload.get('transition','hard'))
  raise RuntimeError(f'Unknown job kind: {kind}')
+def _store_result(result):
+ if not isinstance(result,dict):return result
+ try:
+  from storage import upload_media
+  for clip in result.get('clips',[]):
+   if isinstance(clip,dict) and clip.get('file'):
+    url=upload_media(str(clip['file']))
+    if url:clip['storageUrl']=url
+  if result.get('file'):
+   url=upload_media(str(result['file']))
+   if url:result['storageUrl']=url
+ except Exception:pass
+ return result
 def _run_local(job_id,fn):_run(job_id,fn)
 def _run(job_id,fn):
  token=_CURRENT_JOB.set(job_id);update(job_id,status='processing',progress=5,stage='Starting media pipeline')
- try:update(job_id,status='completed',progress=100,stage='Complete',result=fn())
+ try:result=_store_result(fn());update(job_id,status='completed',progress=100,stage='Complete',result=result)
  except Exception as exc:update(job_id,status='failed',progress=100,stage='Failed',error=str(exc))
  finally:_CURRENT_JOB.reset(token)
 def run_redis_worker_forever():
