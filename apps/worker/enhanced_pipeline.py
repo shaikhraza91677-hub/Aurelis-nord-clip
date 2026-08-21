@@ -6,6 +6,7 @@ from typing import Any
 
 from captioning import transliterate_word, write_captions
 from clip_discovery import discover_moments
+from job_manager import report
 from metadata import generate_metadata
 from smart_crop import build_crop_plan
 from thumbnail import generate_thumbnail
@@ -50,6 +51,7 @@ def _render(video: Path, out: Path, start: float, end: float, crop_plan: dict[st
 
 def process_url(url: str, outdir: str = './output', custom_prompt: str = '') -> dict[str, Any]:
     root = Path(outdir); root.mkdir(parents=True, exist_ok=True)
+    report(8, 'Downloading source')
     with tempfile.TemporaryDirectory(prefix='aurelis-production-') as td:
         work = Path(td); video = download(url, work)
         return _process_video(video, url, root, work, custom_prompt)
@@ -59,25 +61,35 @@ def process_file(source: str, outdir: str = './output', custom_prompt: str = '')
     video = Path(source).resolve()
     if not video.exists() or not video.is_file(): raise RuntimeError('Uploaded media file does not exist')
     root = Path(outdir); root.mkdir(parents=True, exist_ok=True)
+    report(8, 'Reading uploaded media')
     with tempfile.TemporaryDirectory(prefix='aurelis-production-upload-') as td:
         return _process_video(video, f'upload://{video.name}', root, Path(td), custom_prompt)
 
 
 def _process_video(video: Path, source: str, root: Path, work: Path, custom_prompt: str) -> dict[str, Any]:
-    wav = work / 'audio.wav'; audio(video, wav)
+    wav = work / 'audio.wav'
+    audio(video, wav)
+    report(20, 'Transcribing speech')
     transcript = transcribe(wav)
+    report(38, 'Preparing caption language')
     caption_transcript = _caption_transcript(wav, transcript)
+    report(50, 'Finding the best moments')
     clips = discover_moments(transcript, custom_prompt)
+    report(60, 'Analyzing speaker framing')
     crop_plan = build_crop_plan(video)
     rendered = []
+    total = max(1, min(8, len(clips)))
     for index, clip in enumerate(clips[:8], 1):
         start, end = float(clip['start']), float(clip['end'])
+        report(60 + int(25 * index / total), f'Rendering clip {index}/{total}')
         target = root / f'clip-{index:02d}.mp4'
         _render(video, target, start, end, crop_plan, caption_transcript, str(transcript.get('language', 'en')))
         thumbnail = root / f'clip-{index:02d}.jpg'
         generate_thumbnail(str(target), str(thumbnail), min(1.0, max(0.1, (end - start) / 3)))
         rendered.append({**clip, 'file': str(target), 'thumbnail': str(thumbnail), 'captionLanguage': 'hinglish' if str(transcript.get('language', '')).lower().startswith('hi') else 'english', 'hookTransliterated': transliterate_word(str(clip.get('hook', '')), str(transcript.get('language', ''))), 'framing': {'mode': crop_plan.get('mode', 'center'), 'focusX': clip_focus_x(crop_plan, start, end)}})
+    report(92, 'Generating post metadata')
     rendered = generate_metadata(rendered, str(transcript.get('language', 'en')))
+    report(97, 'Saving project manifest')
     manifest = {'source': source, 'customPrompt': custom_prompt, 'language': transcript.get('language'), 'captionLanguage': 'hinglish' if str(transcript.get('language', '')).lower().startswith('hi') else 'english', 'transcript': transcript, 'cropPlan': crop_plan, 'clips': rendered, 'model': OPENROUTER_MODEL}
     (root / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
     return manifest
