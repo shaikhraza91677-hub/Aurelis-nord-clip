@@ -11,7 +11,7 @@ load_dotenv()
 
 OPENROUTER_BASE = os.getenv('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1').rstrip('/')
 OPENROUTER_KEY = os.getenv('OPENROUTER_API_KEY', '')
-OPENROUTER_MODEL = os.getenv('OPENROUTER_MODEL', 'nvidia/nemotron-3-nano-omni:free')
+OPENROUTER_MODEL = os.getenv('OPENROUTER_MODEL', 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free')
 
 
 def run(cmd: list[str]) -> subprocess.CompletedProcess:
@@ -104,7 +104,7 @@ Transcript:\n{transcript.get('text', '')[:80000]}
     return sorted(clips, key=lambda x: float(x.get('score', 0)), reverse=True)[:12]
 
 
-def render(video: Path, out: Path, start: float, end: float, caption_file: Path, caption_style: str = 'Word Pop') -> None:
+def render(video: Path, out: Path, start: float, end: float, caption_file: Path) -> None:
     duration = max(1.0, end - start)
     safe_ass = str(caption_file.resolve()).replace('\\', '/').replace(':', '\\:')
     vf = f"scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,ass='{safe_ass}'"
