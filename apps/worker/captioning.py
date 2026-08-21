@@ -26,21 +26,25 @@ def escape_ass(text: str) -> str:
     return re.sub(r'[{}]', '', text).replace('\\', '/').strip()
 
 
-def write_captions(words: list[dict[str, Any]], start: float, end: float, language: str, out: Path, style: str = 'Word Pop', position: str = 'bottom', size: str = 'medium', color: str = '#FFFFFF') -> None:
+def write_captions(words: list[dict[str, Any]], start: float, end: float, language: str, out: Path, style: str = 'Word Pop', position: str = 'bottom', size: str = 'medium', color: str = '#FFFFFF', aspect: str = '9:16') -> None:
     selected = []
     for word in words:
         if word['end'] < start or word['start'] > end:
             continue
         selected.append({'start': max(0.0, float(word['start']) - start), 'end': min(end - start, float(word['end']) - start), 'word': transliterate_word(str(word['word']), language)})
 
-    fontsize = {'small': 56, 'medium': 78, 'large': 96}.get(size, 78)
+    canvas = {'9:16': (1080, 1920), '1:1': (1080, 1080), '16:9': (1920, 1080)}.get(aspect, (1080, 1920))
+    play_w, play_h = canvas
+    base = {'small': 56, 'medium': 78, 'large': 96}.get(size, 78)
+    scale = play_h / 1920
+    fontsize = max(30, int(base * scale))
     alignment = {'top': 8, 'center': 5, 'bottom': 2}.get(position, 2)
-    margin_v = {'top': 150, 'center': 70, 'bottom': 180}.get(position, 180)
+    margin_v = int({'top': 150, 'center': 70, 'bottom': 180}.get(position, 180) * scale)
     primary = color.replace('#', '&H').upper()
     if len(primary) == 7:
         primary = '&H00' + primary[1:]
 
-    header = f'''[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\nScaledBorderAndShadow: yes\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Main,Arial,{fontsize},{primary},&H00FFFFFF,&H00141418,&H80141418,1,0,0,0,100,100,0,0,1,5,1,{alignment},70,70,{margin_v},1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n'''
+    header = f'''[Script Info]\nScriptType: v4.00+\nPlayResX: {play_w}\nPlayResY: {play_h}\nScaledBorderAndShadow: yes\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Main,Arial,{fontsize},{primary},&H00FFFFFF,&H00141418,&H80141418,1,0,0,0,100,100,0,0,1,5,1,{alignment},70,70,{margin_v},1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n'''
     effects = {
         'Word Pop': r'{\\fad(40,40)\\fscx115\\fscy115}',
         'Highlight': r'{\\bord6\\3c&H00000000\\fad(30,30)}',
