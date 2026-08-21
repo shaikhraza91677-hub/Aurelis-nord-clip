@@ -2,6 +2,7 @@ import json, os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from pipeline import process_file
+from render import render_clip
 from worker import process
 
 
@@ -30,6 +31,10 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if self.path == '/process-file':
                 result = process_file(body['path'], body.get('out', './output'))
+                self._json(200, result)
+                return
+            if self.path == '/render-clip':
+                result = render_clip(body['sourceUrl'], float(body['start']), float(body['end']), body['out'], body.get('config'))
                 self._json(200, result)
                 return
             self._json(404, {'error': 'not found'})
