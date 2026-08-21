@@ -8,6 +8,7 @@ from captioning import transliterate_word, write_captions
 from clip_discovery import discover_moments
 from metadata import generate_metadata
 from smart_crop import build_crop_plan
+from thumbnail import generate_thumbnail
 from worker import OPENROUTER_MODEL, audio, clip_focus_x, download, transcribe
 
 
@@ -73,8 +74,10 @@ def _process_video(video: Path, source: str, root: Path, work: Path, custom_prom
         start, end = float(clip['start']), float(clip['end'])
         target = root / f'clip-{index:02d}.mp4'
         _render(video, target, start, end, crop_plan, caption_transcript, str(transcript.get('language', 'en')))
-        rendered.append({**clip, 'file': str(target), 'captionLanguage': 'hinglish' if str(transcript.get('language', '')).lower().startswith('hi') else 'english', 'hookTransliterated': transliterate_word(str(clip.get('hook', '')), str(transcript.get('language', ''))), 'framing': {'mode': crop_plan.get('mode', 'center'), 'focusX': clip_focus_x(crop_plan, start, end)}})
+        thumbnail = root / f'clip-{index:02d}.jpg'
+        generate_thumbnail(str(target), str(thumbnail), min(1.0, max(0.1, (end - start) / 3)))
+        rendered.append({**clip, 'file': str(target), 'thumbnail': str(thumbnail), 'captionLanguage': 'hinglish' if str(transcript.get('language', '')).lower().startswith('hi') else 'english', 'hookTransliterated': transliterate_word(str(clip.get('hook', '')), str(transcript.get('language', ''))), 'framing': {'mode': crop_plan.get('mode', 'center'), 'focusX': clip_focus_x(crop_plan, start, end)}})
     rendered = generate_metadata(rendered, str(transcript.get('language', 'en')))
-    manifest = {'source': source, 'customPrompt': custom_prompt, 'language': transcript.get('language'), 'transcript': transcript, 'cropPlan': crop_plan, 'clips': rendered, 'model': OPENROUTER_MODEL}
+    manifest = {'source': source, 'customPrompt': custom_prompt, 'language': transcript.get('language'), 'captionLanguage': 'hinglish' if str(transcript.get('language', '')).lower().startswith('hi') else 'english', 'transcript': transcript, 'cropPlan': crop_plan, 'clips': rendered, 'model': OPENROUTER_MODEL}
     (root / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
     return manifest
