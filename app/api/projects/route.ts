@@ -2,11 +2,9 @@ import { NextResponse } from 'next/server';
 import { projects, type Clip } from '@/lib/projects';
 import { z } from 'zod';
 
-const bodySchema = z.object({ url: z.string().url() });
+const bodySchema = z.object({ url: z.string().url(), prompt: z.string().trim().max(500).optional().default('') });
 
-function workerUrl() {
-  return process.env.WORKER_URL || 'http://localhost:8080';
-}
+function workerUrl() { return process.env.WORKER_URL || 'http://localhost:8080'; }
 
 export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
@@ -14,13 +12,13 @@ export async function POST(req: Request) {
 
   const id = crypto.randomUUID();
   const createdAt = new Date().toISOString();
-  const project = { id, sourceUrl: parsed.data.url, status: 'queued' as const, progress: 0, stage: 'Queued', createdAt, clips: [] as Clip[] };
+  const project = { id, sourceUrl: parsed.data.url, customPrompt: parsed.data.prompt, status: 'queued' as const, progress: 0, stage: 'Queued', createdAt, clips: [] as Clip[] };
   projects.set(id, project);
 
   try {
     const response = await fetch(`${workerUrl()}/process`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ url: parsed.data.url, out: process.env.WORKER_OUTPUT_DIR || './output' }), cache: 'no-store',
+      body: JSON.stringify({ url: parsed.data.url, prompt: parsed.data.prompt, out: process.env.WORKER_OUTPUT_DIR || './output' }), cache: 'no-store',
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || 'Media worker failed to queue the project.');
