@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { projects, type Clip } from '@/lib/projects';
+import { type Clip } from '@/lib/projects';
+import { loadProject, listProjects, saveProject } from '@/lib/project-store';
 import { z } from 'zod';
 
 const bodySchema = z.object({ url: z.string().url(), prompt: z.string().trim().max(500).optional().default('') });
@@ -13,7 +14,7 @@ export async function POST(req: Request) {
   const id = crypto.randomUUID();
   const createdAt = new Date().toISOString();
   const project = { id, sourceUrl: parsed.data.url, customPrompt: parsed.data.prompt, status: 'queued' as const, progress: 0, stage: 'Queued', createdAt, clips: [] as Clip[] };
-  projects.set(id, project);
+  await saveProject(project);
 
   try {
     const response = await fetch(`${workerUrl()}/process`, {
@@ -22,15 +23,20 @@ export async function POST(req: Request) {
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || 'Media worker failed to queue the project.');
-    projects.set(id, { ...project, jobId: result.jobId, status: 'processing', progress: 2, stage: 'Downloading source' });
-    return NextResponse.json(projects.get(id), { status: 202 });
+    const queued = { ...project, jobId: result.jobId, status: 'processing' as const, progress: 2, stage: 'Downloading source' };
+    await saveProject(queued);
+    return NextResponse.json(queued, { status: 202 });
   } catch (error) {
     const failed = { ...project, status: 'failed' as const, progress: 100, stage: 'Failed', error: error instanceof Error ? error.message : 'Could not reach media worker.' };
-    projects.set(id, failed);
+    await saveProject(failed);
     return NextResponse.json(failed, { status: 502 });
   }
 }
 
 export async function GET() {
-  return NextResponse.json([...projects.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 50));
+  return NextResponse.json(await listProjects(50));
+}
+
+export async function getProjectFromStore(id: string) {
+  return loadProject(id);
 }
