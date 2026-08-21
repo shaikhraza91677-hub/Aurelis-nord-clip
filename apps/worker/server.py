@@ -7,6 +7,7 @@ from job_manager import get, list_jobs, submit
 from metadata import generate_metadata
 from pipeline import process_file
 from render import render_clip
+from supercut import create_supercut
 from worker import OPENROUTER_MODEL, process
 
 
@@ -40,10 +41,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path.startswith('/jobs/'):
             job = get(path.rsplit('/', 1)[-1])
-            if not job:
-                self._json(404, {'error': 'Job not found'})
-            else:
-                self._json(200, job)
+            self._json(200, job if job else {'error': 'Job not found'})
             return
         self._json(404, {'error': 'not found'})
 
@@ -61,6 +59,10 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if self.path == '/render-clip':
                 job_id = submit('render-clip', lambda: render_clip(body['sourceUrl'], float(body['start']), float(body['end']), body['out'], body.get('config')))
+                self._json(202, {'jobId': job_id, 'status': 'queued'})
+                return
+            if self.path == '/supercut':
+                job_id = submit('supercut', lambda: create_supercut(body.get('files', []), body['out'], body.get('transition', 'hard')))
                 self._json(202, {'jobId': job_id, 'status': 'queued'})
                 return
             self._json(404, {'error': 'not found'})
