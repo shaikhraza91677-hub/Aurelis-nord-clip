@@ -25,6 +25,9 @@ export type Clip = {
   reason: string;
   description?: string;
   hashtags?: string[];
+  youtubeTitle?: string;
+  instagramCaption?: string;
+  tiktokCaption?: string;
   category: ClipCategory | string;
   score: number;
   start: number;
@@ -34,6 +37,9 @@ export type Clip = {
   language?: string;
   framing?: { mode: string; focusX?: number };
   config?: ClipConfig;
+  renderJobId?: string;
+  renderStatus?: 'idle' | 'queued' | 'processing' | 'completed' | 'failed';
+  renderError?: string;
 };
 
 export type Project = {
