@@ -8,22 +8,30 @@ datasource db {
 }
 
 model Project {
-  id          String   @id
-  sourceUrl   String
-  sourcePath  String?
+  id           String   @id
+  sourceUrl    String
+  sourcePath   String?
   customPrompt String?
-  jobId       String?
-  progress    Int      @default(0)
-  stage       String?
-  status      String   @default("queued")
-  createdAt   DateTime @default(now())
-  language    String?
-  model       String?
-  duration    Float?
-  error       String?
-  clips       Json
-  updatedAt   DateTime @updatedAt
+  jobId        String?
+  progress     Int      @default(0)
+  stage        String?
+  status       String   @default("queued")
+  createdAt    DateTime @default(now())
+  language     String?
+  model        String?
+  duration     Float?
+  error        String?
+  clips        Json
+  updatedAt    DateTime @updatedAt
 
   @@index([createdAt])
   @@index([status])
+}
+
+model BrandPreset {
+  id        String   @id
+  name      String
+  config    Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
