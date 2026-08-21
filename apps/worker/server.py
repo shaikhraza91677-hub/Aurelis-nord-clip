@@ -4,9 +4,24 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
 from job_manager import get, list_jobs, submit
+from metadata import generate_metadata
 from pipeline import process_file
 from render import render_clip
-from worker import process
+from worker import OPENROUTER_MODEL, process
+
+
+def analyze_url(url: str, out: str) -> dict:
+    result = process(url, out)
+    result['clips'] = generate_metadata(result.get('clips', []), str(result.get('language', 'en')))
+    result['model'] = OPENROUTER_MODEL
+    return result
+
+
+def analyze_file(path: str, out: str) -> dict:
+    result = process_file(path, out)
+    result['clips'] = generate_metadata(result.get('clips', []), str(result.get('language', 'en')))
+    result['model'] = OPENROUTER_MODEL
+    return result
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -37,18 +52,15 @@ class Handler(BaseHTTPRequestHandler):
             n = int(self.headers.get('Content-Length', '0'))
             body = json.loads(self.rfile.read(n) or b'{}')
             if self.path == '/process':
-                job_id = submit('analyze-url', lambda: process(body['url'], body.get('out', './output')))
+                job_id = submit('analyze-url', lambda: analyze_url(body['url'], body.get('out', './output')))
                 self._json(202, {'jobId': job_id, 'status': 'queued'})
                 return
             if self.path == '/process-file':
-                job_id = submit('analyze-file', lambda: process_file(body['path'], body.get('out', './output')))
+                job_id = submit('analyze-file', lambda: analyze_file(body['path'], body.get('out', './output')))
                 self._json(202, {'jobId': job_id, 'status': 'queued'})
                 return
             if self.path == '/render-clip':
-                job_id = submit(
-                    'render-clip',
-                    lambda: render_clip(body['sourceUrl'], float(body['start']), float(body['end']), body['out'], body.get('config')),
-                )
+                job_id = submit('render-clip', lambda: render_clip(body['sourceUrl'], float(body['start']), float(body['end']), body['out'], body.get('config')))
                 self._json(202, {'jobId': job_id, 'status': 'queued'})
                 return
             self._json(404, {'error': 'not found'})
