@@ -1,26 +1,20 @@
 import { NextResponse } from 'next/server';
 import { type Clip } from '@/lib/projects';
-import { loadProject, listProjects, saveProject } from '@/lib/project-store';
+import { listProjects, saveProject } from '@/lib/project-store';
 import { z } from 'zod';
 
 const bodySchema = z.object({ url: z.string().url(), prompt: z.string().trim().max(500).optional().default('') });
-
 function workerUrl() { return process.env.WORKER_URL || 'http://localhost:8080'; }
 
 export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: 'Enter a valid video URL.' }, { status: 400 });
-
   const id = crypto.randomUUID();
   const createdAt = new Date().toISOString();
   const project = { id, sourceUrl: parsed.data.url, customPrompt: parsed.data.prompt, status: 'queued' as const, progress: 0, stage: 'Queued', createdAt, clips: [] as Clip[] };
   await saveProject(project);
-
   try {
-    const response = await fetch(`${workerUrl()}/process`, {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ url: parsed.data.url, prompt: parsed.data.prompt, out: process.env.WORKER_OUTPUT_DIR || './output' }), cache: 'no-store',
-    });
+    const response = await fetch(`${workerUrl()}/process`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: parsed.data.url, prompt: parsed.data.prompt, out: process.env.WORKER_OUTPUT_DIR || './output' }), cache: 'no-store' });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || 'Media worker failed to queue the project.');
     const queued = { ...project, jobId: result.jobId, status: 'processing' as const, progress: 2, stage: 'Downloading source' };
@@ -33,10 +27,4 @@ export async function POST(req: Request) {
   }
 }
 
-export async function GET() {
-  return NextResponse.json(await listProjects(50));
-}
-
-export async function getProjectFromStore(id: string) {
-  return loadProject(id);
-}
+export async function GET() { return NextResponse.json(await listProjects(50)); }
