@@ -1,38 +1,96 @@
 # Aurelis Nord Clip
 
-AI long-form video → short-form clip platform inspired by the workflow patterns of Cliphi, but implemented as an original product and codebase.
+A production-oriented AI long-form video → short-form clip platform. The product takes inspiration from the workflow patterns users expect from tools such as Cliphi, but the implementation, UX and codebase are original.
 
-## Product
+## Current working slice
 
-Paste a supported public video URL or upload a video. Aurelis Nord Clip will:
+The current build is focused on the highest-value path:
 
-1. ingest the source
-2. extract/transcribe speech with timestamps
-3. detect high-value moments with an LLM
-4. generate vertical 9:16 clip plans
-5. create word-timed captions
-6. apply language-aware caption rules (Hindi → Hinglish, other supported languages → English by default)
-7. render clips with FFmpeg
-8. expose score, title, hook and export metadata
+`YouTube/public URL → yt-dlp → FFmpeg audio → faster-whisper → word timestamps → OpenRouter clip ranking → vertical 9:16 render → animated word-pop captions → project dashboard`
 
-## Architecture
+ClipHi's current product surface confirms the market expectation: AI clip scoring, animated captions, speaker tracking, multiple aspect ratios, presets, an editor, publishing, supercuts, livestream clipping and more. Aurelis will add these in staged releases rather than pretending they are all already production-ready. citeturn666768search0turn666768search8
 
-- `apps/web`: Next.js application and API orchestration
-- `apps/worker`: Python media worker using yt-dlp + FFmpeg
-- `packages/core`: shared schemas and clip-scoring contracts
-- PostgreSQL/Prisma can be added as the persistence layer; the first slice keeps job state API-friendly so the UI is usable immediately.
+## Stack
 
-## Required runtime
+- **Web:** Next.js 15 + React 19 + TypeScript
+- **AI reasoning:** OpenRouter; development default is `nvidia/nemotron-3-nano-omni:free`
+- **Transcription:** faster-whisper with word timestamps
+- **Media:** yt-dlp + FFmpeg
+- **Captions:** ASS-based animated word-pop rendering; Hindi words are transliterated toward Latin-script Hinglish
+- **State:** in-memory MVP contract; PostgreSQL + Prisma is the production persistence target
+- **Queue:** Redis/BullMQ or a dedicated job broker in production
+- **Storage:** S3-compatible object storage in production
 
-- Node.js 20+
-- Python 3.11+
-- FFmpeg
-- yt-dlp
-- An LLM/transcription provider configured through environment variables
+## Product roadmap
+
+### Phase 1 — Core clipping
+- URL ingestion
+- local uploads
+- transcription + language detection
+- AI moment detection
+- clip scoring
+- clip filtering
+- 9:16 rendering
+- word-level animated captions
+- Hindi → Hinglish caption mode
+- preview/download
+
+### Phase 2 — Editor
+- caption style presets
+- typography controls
+- caption position/size/color
+- clip trim handles
+- crop/reframe controls
+- brand presets
+- intro/outro
+- watermark/logo
+- safe zones
+
+### Phase 3 — Smart framing
+- face detection
+- active speaker detection
+- speaker identity tracking
+- multi-person split layouts
+- scene-aware crop switching
+- smooth camera motion
+
+### Phase 4 — AI growth features
+- virality score calibration
+- hook rewriting
+- titles/descriptions/hashtags
+- content categories
+- custom clipping prompts
+- supercuts/highlight reels
+- clip variation generation
+
+### Phase 5 — Distribution
+- YouTube Shorts publishing
+- TikTok export/publishing
+- Instagram Reels publishing
+- scheduling
+- render history
+- credits/usage accounting
+- team workspaces
+
+### Phase 6 — Scale
+- PostgreSQL/Prisma
+- Redis queue
+- S3 storage + signed URLs
+- worker autoscaling
+- retries/idempotency
+- observability
+- per-user quotas and billing
 
 ## Environment
 
-Copy `.env.example` to `.env.local` and configure the provider when ready. The UI and job contracts are designed so the provider can be swapped without rewriting the product.
+Copy `.env.example` to `.env.local` and never commit API keys.
+
+```env
+OPENROUTER_API_KEY=
+OPENROUTER_MODEL=nvidia/nemotron-3-nano-omni:free
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+WORKER_URL=http://localhost:8080
+```
 
 ## Development
 
@@ -41,16 +99,18 @@ npm install
 npm run dev
 ```
 
-Worker:
+Run the media worker in a second terminal:
 
 ```bash
 cd apps/worker
 python -m venv .venv
 # activate the environment
 pip install -r requirements.txt
-python worker.py
+python server.py
 ```
+
+The worker requires `ffmpeg`, `yt-dlp`, and a compatible Python environment for `faster-whisper`.
 
 ## Important
 
-Only process media you own or have permission to use. Public URLs are not automatically licensed for reuse.
+Only process media you own or are authorized to repurpose. A public URL is not automatically licensed for reuse.
