@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { projects, defaultClipConfig, type ClipConfig } from '@/lib/projects';
+import { hydrate } from '../route';
 import { z } from 'zod';
 
 const configSchema = z.object({
@@ -13,11 +14,30 @@ const configSchema = z.object({
   showCaptions: z.boolean().optional(),
 });
 
+async function syncWorker(project: any) {
+  if (!project.jobId || project.status === 'completed' || project.status === 'failed') return project;
+  const worker = process.env.WORKER_URL || 'http://localhost:8080';
+  try {
+    const response = await fetch(`${worker}/jobs/${project.jobId}`, { cache: 'no-store' });
+    if (!response.ok) return project;
+    const job = await response.json();
+    if (job.status === 'completed' && job.result) {
+      const completed = hydrate(job.result, project.id, project.sourceUrl, project.createdAt);
+      projects.set(project.id, { ...project, ...completed, jobId: project.jobId, sourcePath: project.sourcePath });
+    } else if (job.status === 'failed') {
+      projects.set(project.id, { ...project, status: 'failed', progress: 100, stage: 'Failed', error: job.error || 'Worker job failed.' });
+    } else {
+      projects.set(project.id, { ...project, status: 'processing', progress: Number(job.progress || project.progress || 0), stage: job.stage || project.stage });
+    }
+  } catch { /* browser will keep polling; transient worker failures should not destroy project state */ }
+  return projects.get(project.id) || project;
+}
+
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const project = projects.get(id);
   if (!project) return NextResponse.json({ error: 'Project not found.' }, { status: 404 });
-  return NextResponse.json(project);
+  return NextResponse.json(await syncWorker(project));
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
