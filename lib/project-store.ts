@@ -23,7 +23,7 @@ function toDb(project: Project) {
     model: project.model,
     duration: project.duration,
     error: project.error,
-    clips: project.clips,
+    clips: project.clips as any,
   };
 }
 
