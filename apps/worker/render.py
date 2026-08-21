@@ -1,3 +1,4 @@
+import os
 import shutil
 import subprocess
 import tempfile
@@ -40,6 +41,34 @@ def _run(cmd: list[str]) -> None:
     subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
 
+def _translate_for_captions(wav: Path, transcript: dict[str, Any], language_mode: str) -> tuple[dict[str, Any], str]:
+    source_language = str(transcript.get('language', 'en')).lower()
+    if language_mode == 'original':
+        return transcript, source_language
+    if source_language.startswith('hi'):
+        return transcript, 'hi'
+    if language_mode == 'english' or language_mode == 'auto':
+        try:
+            from faster_whisper import WhisperModel
+            model = WhisperModel(os.getenv('WHISPER_MODEL', 'small'), device=os.getenv('WHISPER_DEVICE', 'cpu'), compute_type=os.getenv('WHISPER_COMPUTE_TYPE', 'int8'))
+            segments, _ = model.transcribe(str(wav), word_timestamps=True, vad_filter=True, task='translate')
+            words: list[dict[str, Any]] = []
+            out_segments: list[dict[str, Any]] = []
+            text_parts: list[str] = []
+            for seg in segments:
+                seg_words = []
+                for word in (seg.words or []):
+                    item = {'start': float(word.start), 'end': float(word.end), 'word': word.word.strip()}
+                    words.append(item); seg_words.append(item)
+                text = seg.text.strip()
+                if text: text_parts.append(text)
+                out_segments.append({'start': float(seg.start), 'end': float(seg.end), 'text': text, 'words': seg_words})
+            return {'language': source_language, 'captionLanguage': 'en', 'segments': out_segments, 'words': words, 'text': ' '.join(text_parts)}, 'en'
+        except Exception:
+            return transcript, source_language
+    return transcript, source_language
+
+
 def render_clip(source_url: str, start: float, end: float, out: str, config: dict[str, Any] | None = None) -> dict[str, Any]:
     config = config or {}
     style = str(config.get('captionStyle', 'Word Pop'))
@@ -57,17 +86,13 @@ def render_clip(source_url: str, start: float, end: float, out: str, config: dic
         wav = work / 'audio.wav'
         audio(video, wav)
         transcript = transcribe(wav)
-        language = str(transcript.get('language', 'en'))
-        if language_mode == 'english':
-            language = 'en'
-        elif language_mode == 'original':
-            language = 'original'
+        caption_transcript, caption_language = _translate_for_captions(wav, transcript, language_mode)
 
         crop_plan = build_crop_plan(video)
         focus_x = 0.5 if framing == 'center' else clip_focus_x(crop_plan, start, end)
         caption_file = work / 'captions.ass'
         if show:
-            write_captions(transcript['words'], start, end, language, caption_file, style=style, position=position, size=size, color=color, aspect=aspect)
+            write_captions(caption_transcript['words'], start, end, caption_language, caption_file, style=style, position=position, size=size, color=color, aspect=aspect)
         else:
             caption_file.write_text('[Script Info]\nScriptType: v4.00+\n', encoding='utf-8')
 
@@ -80,9 +105,5 @@ def render_clip(source_url: str, start: float, end: float, out: str, config: dic
         safe_ass = str(caption_file.resolve()).replace('\\', '/').replace(':', '\\:')
         vf = f"{vf},ass='{safe_ass}'"
         duration = max(1.0, end - start)
-        _run([
-            'ffmpeg', '-y', '-ss', f'{start:.3f}', '-i', str(video), '-t', f'{duration:.3f}',
-            '-vf', vf, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20',
-            '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', str(target),
-        ])
-        return {'file': str(target), 'language': transcript.get('language'), 'focusX': focus_x, 'style': style, 'aspectRatio': aspect, 'framing': framing}
+        _run(['ffmpeg', '-y', '-ss', f'{start:.3f}', '-i', str(video), '-t', f'{duration:.3f}', '-vf', vf, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', str(target)])
+        return {'file': str(target), 'language': transcript.get('language'), 'captionLanguage': caption_language, 'focusX': focus_x, 'style': style, 'aspectRatio': aspect, 'framing': framing}
