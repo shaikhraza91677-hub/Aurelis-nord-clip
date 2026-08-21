@@ -19,15 +19,37 @@ export const defaultClipConfig: ClipConfig = {
 };
 
 export type Clip = {
-  id: string; title: string; hook: string; reason: string; category: ClipCategory | string;
-  score: number; start: number; end: number; file?: string; captionTimeline?: string;
-  language?: string; framing?: { mode: string; focusX?: number }; config?: ClipConfig;
+  id: string;
+  title: string;
+  hook: string;
+  reason: string;
+  description?: string;
+  hashtags?: string[];
+  category: ClipCategory | string;
+  score: number;
+  start: number;
+  end: number;
+  file?: string;
+  captionTimeline?: string;
+  language?: string;
+  framing?: { mode: string; focusX?: number };
+  config?: ClipConfig;
 };
 
 export type Project = {
-  id: string; sourceUrl: string; sourcePath?: string;
-  status: 'queued' | 'processing' | 'completed' | 'failed'; createdAt: string;
-  language?: string; model?: string; error?: string; clips: Clip[];
+  id: string;
+  sourceUrl: string;
+  sourcePath?: string;
+  jobId?: string;
+  progress?: number;
+  stage?: string;
+  status: 'queued' | 'processing' | 'completed' | 'failed';
+  createdAt: string;
+  language?: string;
+  model?: string;
+  duration?: number;
+  error?: string;
+  clips: Clip[];
 };
 
 declare global { var aurelisProjects: Map<string, Project> | undefined; }
