@@ -1,0 +1,29 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id          String   @id
+  sourceUrl   String
+  sourcePath  String?
+  customPrompt String?
+  jobId       String?
+  progress    Int      @default(0)
+  stage       String?
+  status      String   @default("queued")
+  createdAt   DateTime @default(now())
+  language    String?
+  model       String?
+  duration    Float?
+  error       String?
+  clips       Json
+  updatedAt   DateTime @updatedAt
+
+  @@index([createdAt])
+  @@index([status])
+}
