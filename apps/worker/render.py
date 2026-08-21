@@ -1,4 +1,4 @@
-import os
+import shutil
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -6,6 +6,15 @@ from typing import Any
 from captioning import write_captions
 from smart_crop import build_crop_plan
 from worker import audio, download, render, transcribe, clip_focus_x
+
+
+def _source_path(source: str, work: Path) -> Path:
+    local = Path(source)
+    if local.exists() and local.is_file():
+        target = work / local.name
+        shutil.copy2(local, target)
+        return target
+    return download(source, work)
 
 
 def render_clip(source_url: str, start: float, end: float, out: str, config: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -19,14 +28,12 @@ def render_clip(source_url: str, start: float, end: float, out: str, config: dic
 
     with tempfile.TemporaryDirectory(prefix='aurelis-render-') as td:
         work = Path(td)
-        video = download(source_url, work)
+        video = _source_path(source_url, work)
         wav = work / 'audio.wav'
         audio(video, wav)
         transcript = transcribe(wav)
         language = 'en' if language_mode == 'english' else str(transcript.get('language', 'en'))
-        if language_mode == 'original':
-            language = 'original'
-
+        if language_mode == 'original': language = 'original'
         crop_plan = build_crop_plan(video)
         focus_x = clip_focus_x(crop_plan, start, end)
         caption_file = work / 'captions.ass'
@@ -34,7 +41,6 @@ def render_clip(source_url: str, start: float, end: float, out: str, config: dic
             write_captions(transcript['words'], start, end, language, caption_file, style=style, position=position, size=size, color=color)
         else:
             caption_file.write_text('[Script Info]\nScriptType: v4.00+\n', encoding='utf-8')
-
         target = Path(out).resolve()
         target.parent.mkdir(parents=True, exist_ok=True)
         render(video, target, start, end, caption_file, focus_x)
