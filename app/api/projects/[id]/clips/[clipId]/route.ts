@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createReadStream, existsSync } from 'node:fs';
 import { basename } from 'node:path';
 import { Readable } from 'node:stream';
-import { projects } from '@/lib/projects';
+import { loadProject, saveProject } from '@/lib/project-store';
 
 async function syncRender(project: any, clip: any) {
   if (!clip.renderJobId || clip.renderStatus === 'completed' || clip.renderStatus === 'failed') return clip;
@@ -19,14 +19,14 @@ async function syncRender(project: any, clip: any) {
     } else {
       next = { ...clip, renderStatus: job.status === 'queued' ? 'queued' : 'processing' };
     }
-    projects.set(project.id, { ...project, clips: project.clips.map((c: any) => c.id === clip.id ? next : c) });
+    await saveProject({ ...project, clips: project.clips.map((c: any) => c.id === clip.id ? next : c) });
     return next;
   } catch { return clip; }
 }
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string; clipId: string }> }) {
   const { id, clipId } = await params;
-  const project = projects.get(id);
+  const project = await loadProject(id);
   if (!project) return NextResponse.json({ error: 'Project not found.' }, { status: 404 });
   let clip = project.clips.find(c => c.id === clipId);
   if (!clip) return NextResponse.json({ error: 'Clip not found.' }, { status: 404 });
@@ -41,27 +41,23 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string; clipId: string }> }) {
   const { id, clipId } = await params;
-  const project = projects.get(id);
+  const project = await loadProject(id);
   if (!project) return NextResponse.json({ error: 'Project not found.' }, { status: 404 });
   const clip = project.clips.find(c => c.id === clipId);
   if (!clip) return NextResponse.json({ error: 'Clip not found.' }, { status: 404 });
-
   const body = await req.json().catch(() => ({}));
   const config = body.config || clip.config || {};
   const source = project.sourcePath || project.sourceUrl;
   const workerUrl = process.env.WORKER_URL || 'http://localhost:8080';
   const outputDir = process.env.WORKER_OUTPUT_DIR || './output';
   const out = `${outputDir}/${id}-${clipId.replace(/[^a-zA-Z0-9_-]/g, '_')}-render.mp4`;
-
   try {
-    const response = await fetch(`${workerUrl}/render-clip`, {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ sourceUrl: source, start: clip.start, end: clip.end, out, config }), cache: 'no-store'
-    });
+    const response = await fetch(`${workerUrl}/render-clip`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sourceUrl: source, start: clip.start, end: clip.end, out, config }), cache: 'no-store' });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || 'Render failed to queue.');
     const nextClip = { ...clip, config, renderJobId: result.jobId, renderStatus: 'queued' as const, renderError: undefined };
-    projects.set(id, { ...project, clips: project.clips.map(c => c.id === clipId ? nextClip : c) });
+    const nextProject = { ...project, clips: project.clips.map(c => c.id === clipId ? nextClip : c) };
+    await saveProject(nextProject);
     return NextResponse.json(nextClip, { status: 202 });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Render failed.' }, { status: 502 });
