@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.gitignore
+.env
+.env.local
+uploads
+output
+apps/worker/.venv
+__pycache__
+*.pyc
+npm-debug.log*
