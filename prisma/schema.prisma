@@ -7,8 +7,32 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id           String    @id
+  email        String    @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  sessions     Session[]
+  projects     Project[]
+}
+
+model Session {
+  id        String   @id
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  @@index([userId])
+  @@index([expiresAt])
+}
+
 model Project {
   id           String   @id
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   sourceUrl    String
   sourcePath   String?
   customPrompt String?
@@ -23,15 +47,26 @@ model Project {
   error        String?
   clips        Json
   updatedAt    DateTime @updatedAt
-
   @@index([createdAt])
   @@index([status])
+  @@index([userId, createdAt])
 }
 
 model BrandPreset {
   id        String   @id
+  userId    String?
   name      String
   config    Json
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  @@index([userId, updatedAt])
+}
+
+model UsageLedger {
+  id        String   @id
+  userId    String
+  kind      String
+  units     Int      @default(1)
+  createdAt DateTime @default(now())
+  @@index([userId, createdAt])
 }
