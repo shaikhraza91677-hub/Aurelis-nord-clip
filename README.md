@@ -6,14 +6,14 @@ A production-oriented AI long-form video → short-form clip platform. The produ
 
 The current build is focused on the highest-value path:
 
-`YouTube/public URL → yt-dlp → FFmpeg audio → faster-whisper → word timestamps → OpenRouter clip ranking → vertical 9:16 render → animated word-pop captions → project dashboard`
+`YouTube/public URL or upload → yt-dlp/file ingest → FFmpeg audio → faster-whisper → word timestamps → OpenRouter clip ranking → vertical 9:16 render → animated word-pop captions → project dashboard`
 
-ClipHi's current product surface confirms the market expectation: AI clip scoring, animated captions, speaker tracking, multiple aspect ratios, presets, an editor, publishing, supercuts, livestream clipping and more. Aurelis will add these in staged releases rather than pretending they are all already production-ready. citeturn666768search0turn666768search8
+The market baseline includes AI clip scoring, animated captions, speaker tracking, multiple aspect ratios, presets, an editor, publishing, supercuts and livestream clipping. Aurelis will add these in staged releases rather than pretending they are already production-ready.
 
 ## Stack
 
 - **Web:** Next.js 15 + React 19 + TypeScript
-- **AI reasoning:** OpenRouter; development default is `nvidia/nemotron-3-nano-omni:free`
+- **AI reasoning:** OpenRouter; development default is `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`
 - **Transcription:** faster-whisper with word timestamps
 - **Media:** yt-dlp + FFmpeg
 - **Captions:** ASS-based animated word-pop rendering; Hindi words are transliterated toward Latin-script Hinglish
@@ -87,7 +87,7 @@ Copy `.env.example` to `.env.local` and never commit API keys.
 
 ```env
 OPENROUTER_API_KEY=
-OPENROUTER_MODEL=nvidia/nemotron-3-nano-omni:free
+OPENROUTER_MODEL=nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
 OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
 WORKER_URL=http://localhost:8080
 ```
