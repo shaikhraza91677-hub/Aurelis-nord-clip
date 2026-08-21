@@ -4,7 +4,7 @@ import { FormEvent, useRef, useState } from 'react';
 
 const features = [
   ['AI moment detection', 'Find hooks, punchlines, insights and emotional peaks instead of blindly slicing every N seconds.'],
-  ['Language-aware captions', 'Detect the spoken language. Hindi captions can be normalized into Hinglish while other languages can default to English.'],
+  ['Language-aware captions', 'Hindi becomes Latin-script Hinglish. Other spoken languages are translated into English captions.'],
   ['Smart vertical framing', 'Detect faces and bias each 9:16 crop toward the likely active speaker.'],
   ['Virality scoring', 'Rank candidates by hook strength, standalone context, payoff, pacing and shareability.'],
   ['Caption presets', 'Word-pop, highlight, fade and bounce styles with size, position and color controls.'],
@@ -13,6 +13,7 @@ const features = [
 
 export default function Home() {
   const [url, setUrl] = useState('');
+  const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState('');
@@ -24,7 +25,7 @@ export default function Home() {
     if (!url.trim()) return setMessage('Paste a video URL first.');
     setLoading(true);
     try {
-      const res = await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+      const res = await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, prompt }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not start the project.');
       window.location.href = `/projects/${data.id}`;
@@ -38,7 +39,7 @@ export default function Home() {
     setUploading(true);
     try {
       const form = new FormData();
-      form.append('file', file);
+      form.append('file', file); form.append('prompt', prompt);
       const res = await fetch('/api/uploads', { method: 'POST', body: form });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Upload failed.');
@@ -53,9 +54,10 @@ export default function Home() {
       <span className="eyebrow">AI VIDEO REPURPOSING · BUILT FOR SHORT-FORM</span>
       <h1>Long video in.<br/><em>Scroll-stopping clips out.</em></h1>
       <p>Paste a YouTube link or upload your media. Aurelis finds the moments worth posting, reframes them around the speaker, and builds captions around every spoken word.</p>
-      <form className="ingest" onSubmit={submit}><input value={url} onChange={e=>setUrl(e.target.value)} placeholder="Paste a YouTube, Twitch, Kick or video URL…" aria-label="Video URL"/><button className="primary" disabled={loading}>{loading ? 'Analyzing…' : 'Get clips'}</button></form>
+      <form className="ingest" onSubmit={submit}><input value={url} onChange={e=>setUrl(e.target.value)} placeholder="Paste a YouTube, Twitch, Kick or video URL…" aria-label="Video URL"/><button className="primary" disabled={loading}>{loading ? 'Queueing…' : 'Get clips'}</button></form>
+      <textarea value={prompt} onChange={e=>setPrompt(e.target.value)} maxLength={500} className="promptbox" placeholder="Optional: tell Aurelis what to hunt for — e.g. ‘Find the funniest moments and controversial takes’ or ‘Only business lessons’." aria-label="Custom clipping instruction" />
       <input ref={inputRef} type="file" accept="video/*" hidden onChange={e=>upload(e.target.files?.[0])}/>
-      <button className="drop dropbutton" disabled={uploading} onClick={() => inputRef.current?.click()}>{uploading ? 'Uploading and analyzing…' : 'Upload a video file · up to 500 MB'}</button>
+      <button className="drop dropbutton" disabled={uploading} onClick={() => inputRef.current?.click()}>{uploading ? 'Uploading and queueing…' : 'Upload a video file · up to 500 MB'}</button>
       {message && <div className="error">{message}</div>}
       <div className="status">Only process videos you own or have permission to repurpose.</div>
     </section>
