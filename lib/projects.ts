@@ -14,7 +14,7 @@ export const defaultClipConfig: ClipConfig = { captionStyle: 'Word Pop', caption
 export type Clip = {
   id: string; title: string; hook: string; reason: string; description?: string; hashtags?: string[];
   youtubeTitle?: string; instagramCaption?: string; tiktokCaption?: string; category: ClipCategory | string;
-  score: number; start: number; end: number; file?: string; captionTimeline?: string; language?: string;
+  score: number; start: number; end: number; file?: string; thumbnail?: string; captionTimeline?: string; language?: string;
   framing?: { mode: string; focusX?: number }; config?: ClipConfig;
   renderJobId?: string; renderStatus?: 'idle' | 'queued' | 'processing' | 'completed' | 'failed'; renderError?: string;
 };
