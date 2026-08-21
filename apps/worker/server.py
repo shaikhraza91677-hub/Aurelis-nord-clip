@@ -3,26 +3,18 @@ import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
+from enhanced_pipeline import process_file, process_url
 from job_manager import get, list_jobs, submit
-from metadata import generate_metadata
-from pipeline import process_file
 from render import render_clip
 from supercut import create_supercut
-from worker import OPENROUTER_MODEL, process
 
 
 def analyze_url(url: str, out: str) -> dict:
-    result = process(url, out)
-    result['clips'] = generate_metadata(result.get('clips', []), str(result.get('language', 'en')))
-    result['model'] = OPENROUTER_MODEL
-    return result
+    return process_url(url, out)
 
 
 def analyze_file(path: str, out: str) -> dict:
-    result = process_file(path, out)
-    result['clips'] = generate_metadata(result.get('clips', []), str(result.get('language', 'en')))
-    result['model'] = OPENROUTER_MODEL
-    return result
+    return process_file(path, out)
 
 
 class Handler(BaseHTTPRequestHandler):
