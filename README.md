@@ -1,121 +1,250 @@
 # Aurelis Nord Clip
 
-A full-stack AI long-form video → short-form clipping platform with an original UX and implementation.
+Aurelis Nord is an AI long-form video → short-form clipping platform. It intentionally focuses on recorded video repurposing; **livestream clipping, AI voiceover and AI music are out of scope by design**.
 
-## What works now
-
-`YouTube/public URL or upload → async worker job → yt-dlp/file ingest → FFmpeg audio → faster-whisper → AI clip discovery → language-aware captions → smart face-biased crop → 9:16 MP4 + thumbnail → project dashboard`
-
-The current build includes:
-
-- YouTube/public URL ingestion and local video uploads
-- Background processing with job IDs and live progress polling
-- AI moment discovery with a custom creator instruction
-- 0–100 clip scoring and category filtering
-- Hindi caption path → Latin-script Hinglish
-- Other-language caption path → English translation
-- Word-level timed animated captions: Word Pop, Highlight, Fade, Bounce
-- 9:16, 1:1 and 16:9 editor output
-- Smart/center/left/right framing controls
-- OpenCV face-biased smart framing fallback
-- Clip preview, download and generated thumbnails
-- AI-generated YouTube titles, descriptions, Instagram/TikTok captions and hashtags with graceful fallback
-- Asynchronous per-clip re-rendering
-- Multi-clip Supercut generation
-- Transcript export: TXT, SRT, VTT and JSON
-- PostgreSQL + Prisma persistence when `DATABASE_URL` is configured, with in-memory fallback for local-only development
-- Docker Compose stack for web + worker + PostgreSQL with shared media volumes
-
-## Architecture
+## What Aurelis does
 
 ```text
-Next.js Web
-   │
-   ├── Project API ────────────────┐
-   ├── Upload API                  │
-   ├── Editor / Render API         │ HTTP
-   └── Export APIs                 │
-                                  ▼
-                         Python Media Worker
-                                  │
-             ┌────────────────────┼──────────────────┐
-             ▼                    ▼                  ▼
-          yt-dlp             faster-whisper       FFmpeg
-             │                    │                  │
-             └──────────────┬─────┴──────────────────┘
-                            ▼
-                       OpenRouter LLM
-                            │
-                            ▼
-                   Clip discovery + metadata
-                            │
-                            ▼
-                    Rendered short-form MP4
+YouTube / public video URL / upload
+            ↓
+        Background job
+            ↓
+        FFmpeg + Whisper
+            ↓
+       AI clip discovery
+            ↓
+       Virality scoring
+            ↓
+ Hindi → Hinglish captions
+ Other languages → English
+            ↓
+ Smart speaker framing
+            ↓
+  9:16 / 1:1 / 16:9 render
+            ↓
+ MP4 + thumbnail + metadata
 ```
 
-## Stack
+### Built features
 
-- Web: Next.js 15, React 19, TypeScript
-- Worker: Python 3.11
-- AI reasoning: OpenRouter; development default uses `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`
-- Transcription: faster-whisper
-- Media: FFmpeg + yt-dlp
-- Vision fallback: OpenCV Haar face detection
-- Captions: ASS timed word rendering
-- Persistence: PostgreSQL + Prisma, optional memory fallback
+- Account signup/login/logout and protected projects
+- YouTube/public URL ingestion
+- Direct video upload
+- Custom clipping instructions
+- Background processing with progress polling
+- AI moment discovery and 0–100 scoring
+- Clip category filters
+- Hindi → Latin-script Hinglish caption path
+- Other spoken languages → English caption path
+- Word-level timed captions: Word Pop, Highlight, Fade, Bounce
+- Caption position, size, color and on/off controls
+- 9:16, 1:1 and 16:9 output
+- Smart / center / left / right framing
+- Lightweight active-speaker heuristic using face + mouth-motion signals
+- Clip thumbnails and browser previews
+- Per-clip asynchronous re-render
+- Transcript export: TXT, SRT, VTT, JSON
+- AI titles, descriptions, hashtags and platform captions
+- Multi-clip supercuts
+- Persistent PostgreSQL/Prisma project storage
+- Redis-backed durable queue with local fallback
+- Persistent brand presets
+- Plan usage limits / quotas
+- Request rate limiting
+- Encrypted publishing-token storage
+- YouTube / TikTok / Instagram publishing adapters
+- Stripe Checkout + subscription webhook reconciliation
+- Optional S3-compatible media storage / signed URLs
+- Docker Compose stack for web + worker + PostgreSQL + Redis
+- GitHub CI for TypeScript/build + Python smoke tests
 
-## Run locally
+## Deliberately not included
 
-### Web
+These are **not bugs or unfinished requirements**:
+
+- Livestream clipping
+- AI voiceover
+- AI-generated music
+
+## Quickest way to use it locally
+
+### 1. Clone
+
+```bash
+git clone https://github.com/shaikhraza91677-hub/Aurelis-nord-clip.git
+cd Aurelis-nord-clip
+```
+
+### 2. Create environment
+
+```bash
+cp .env.example .env.local
+```
+
+At minimum set:
+
+```env
+OPENROUTER_API_KEY=YOUR_OPENROUTER_KEY
+OPENROUTER_MODEL=nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
+DATABASE_URL=postgresql://aurelis:aurelis_dev_change_me@localhost:5432/aurelis?schema=public
+WORKER_URL=http://localhost:8080
+WORKER_OUTPUT_DIR=./output
+REDIS_URL=redis://localhost:6379/0
+```
+
+For local development, PostgreSQL and Redis must be running. FFmpeg and yt-dlp must also be installed and available on PATH.
+
+### 3. Install web dependencies
 
 ```bash
 npm install
 npm run db:generate
+npm run db:push
+```
+
+### 4. Start the web app
+
+```bash
 npm run dev
 ```
 
-### Worker
+Open:
+
+`http://localhost:3000`
+
+### 5. Start the worker
+
+In another terminal:
 
 ```bash
 cd apps/worker
 python -m venv .venv
-# activate the environment
+```
+
+Windows:
+
+```bash
+.venv\Scripts\activate
+```
+
+macOS/Linux:
+
+```bash
+source .venv/bin/activate
+```
+
+Then:
+
+```bash
 pip install -r requirements.txt
 python server.py
 ```
 
-Required tools: `ffmpeg` and `yt-dlp` available on PATH.
+The worker listens on `http://localhost:8080` by default.
 
-### Environment
+## First-use walkthrough
 
-```env
-APP_URL=http://localhost:3000
-WORKER_URL=http://localhost:8080
-OPENROUTER_API_KEY=
-OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
-OPENROUTER_MODEL=nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
-WHISPER_MODEL=small
-WHISPER_DEVICE=cpu
-WHISPER_COMPUTE_TYPE=int8
-WORKER_OUTPUT_DIR=./output
-DATABASE_URL=postgresql://aurelis:aurelis_dev_change_me@localhost:5432/aurelis?schema=public
-```
+1. Open `http://localhost:3000`.
+2. Create an account at `/signup`.
+3. Sign in at `/login`.
+4. Paste a YouTube/public video URL or upload a video.
+5. Optionally enter an instruction such as:
+   - `Find the funniest moments.`
+   - `Only find business lessons.`
+   - `Find surprising or controversial statements.`
+6. Start processing.
+7. The project page polls the background job and shows progress.
+8. When clips appear, filter by category and inspect their scores.
+9. Choose caption style, language, format, framing and caption settings.
+10. Click **Get clip** to render or **Re-render** after changing settings.
+11. Preview the MP4 in the browser and download it.
+12. Export TXT/SRT/VTT transcript files when needed.
+13. Save/apply a brand preset from the Brand area.
+14. Connect YouTube/TikTok/Instagram publishing credentials before using the publish controls.
+15. Configure Stripe only when you want paid plans enabled.
 
-## Docker
+## Docker: easiest complete stack
+
+The repository includes a Docker Compose stack for:
+
+- PostgreSQL
+- Redis
+- Python media worker
+- Next.js web app
+- Shared media volumes
+
+Set the secrets in `.env.local` / your deployment environment, then run:
 
 ```bash
-export OPENROUTER_API_KEY=your-development-key
-cp .env.example .env.local
-
 docker compose up --build
 ```
 
-Then open `http://localhost:3000`.
+Open:
 
-Before any public deployment, replace the development database password, set a paid/private AI model, move media to object storage, and put secrets in the deployment secret manager.
+`http://localhost:3000`
 
-## Production hardening still required
+For a real deployment, replace development PostgreSQL credentials and set a strong auth/encryption secret.
 
-The repo now has the production seams for persistence and container deployment. Before a public SaaS launch, add Redis/BullMQ or another durable external queue, S3-compatible object storage with signed URLs, real authentication/team workspaces, OAuth publishing integrations, stronger active-speaker tracking, rate limiting, quotas/billing, and observability.
+## External services needed for production
 
-Only process media you own or are authorized to repurpose. A public URL is not automatically licensed for reuse.
+### Required for AI clipping
+
+- OpenRouter API key
+- A paid/private production model is recommended before launch
+
+### Required for publishing
+
+- YouTube OAuth/app credentials
+- TikTok developer app + required Content Posting permissions
+- Instagram/Meta app + appropriate professional-account permissions
+- Publicly reachable media URL for URL-pull publishing paths
+
+### Required for billing
+
+- Stripe secret key
+- Stripe price IDs
+- Stripe webhook secret
+
+### Optional production infrastructure
+
+- S3-compatible object storage
+- Redis/managed Redis
+- Managed PostgreSQL
+
+## Verify before launch
+
+Run the same checks locally that CI runs:
+
+```bash
+npm install
+npm run db:generate
+npx tsc --noEmit
+npm run build
+```
+
+Worker:
+
+```bash
+python -m compileall apps/worker
+python -m unittest discover apps/worker/tests -v
+```
+
+Then manually test one real video through this entire path:
+
+`signup → login → URL/upload → processing → clips → render → preview → download → transcript export`
+
+After that test:
+
+`brand preset → publisher connection → publish`
+
+And separately:
+
+`Stripe Checkout → webhook → plan/usage enforcement`
+
+## Important reality check
+
+The codebase contains the integrations and production seams, but **third-party OAuth, Stripe, S3 and production infrastructure cannot be validated from this repository alone**. Those need real credentials and a reachable deployment environment.
+
+Also, the current active-speaker logic is a lightweight computer-vision heuristic, not a proprietary neural active-speaker model. It is designed to be replaceable without changing the renderer contract.
+
+Only process media you own or are authorized to repurpose.
