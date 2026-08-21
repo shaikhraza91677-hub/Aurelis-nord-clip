@@ -51,6 +51,7 @@ services:
       DATABASE_URL: postgresql://aurelis:aurelis_dev_change_me@db:5432/aurelis?schema=public
     ports:
       - "3000:3000"
+    command: ["sh", "-c", "npx prisma db push && npm run start"]
     volumes:
       - uploads:/app/uploads
       - output:/app/output
