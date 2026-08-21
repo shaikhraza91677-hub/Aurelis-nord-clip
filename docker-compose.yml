@@ -45,6 +45,11 @@ services:
       REDIS_URL: redis://redis:6379/0
       APP_URL: http://web:3000
       WORKER_MAX_CONCURRENCY: ${WORKER_MAX_CONCURRENCY:-1}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
     volumes:
       - uploads:/app/uploads
       - output:/app/output
@@ -61,10 +66,16 @@ services:
         condition: service_started
     environment:
       NODE_ENV: production
-      APP_URL: http://localhost:3000
+      APP_URL: ${APP_URL:-http://localhost:3000}
       WORKER_URL: http://worker:8080
       WORKER_OUTPUT_DIR: /app/output
       DATABASE_URL: postgresql://aurelis:aurelis_dev_change_me@db:5432/aurelis?schema=public
+      AUTH_SECRET: ${AUTH_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      PUBLIC_MEDIA_BASE_URL: ${PUBLIC_MEDIA_BASE_URL:-}
     ports:
       - "3000:3000"
     command: ["sh", "-c", "npx prisma db push && npm run start"]
