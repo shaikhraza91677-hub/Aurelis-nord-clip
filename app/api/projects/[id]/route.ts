@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { projects, defaultClipConfig, type ClipConfig } from '@/lib/projects';
-import { hydrate } from '../route';
+import { hydrateWorkerResult } from '@/lib/hydrate';
 import { z } from 'zod';
 
 const configSchema = z.object({
@@ -22,14 +22,14 @@ async function syncWorker(project: any) {
     if (!response.ok) return project;
     const job = await response.json();
     if (job.status === 'completed' && job.result) {
-      const completed = hydrate(job.result, project.id, project.sourceUrl, project.createdAt);
+      const completed = hydrateWorkerResult(job.result, project.id, project.sourceUrl, project.createdAt);
       projects.set(project.id, { ...project, ...completed, jobId: project.jobId, sourcePath: project.sourcePath });
     } else if (job.status === 'failed') {
       projects.set(project.id, { ...project, status: 'failed', progress: 100, stage: 'Failed', error: job.error || 'Worker job failed.' });
     } else {
       projects.set(project.id, { ...project, status: 'processing', progress: Number(job.progress || project.progress || 0), stage: job.stage || project.stage });
     }
-  } catch { /* browser will keep polling; transient worker failures should not destroy project state */ }
+  } catch { /* transient worker failures are safe; browser keeps polling */ }
   return projects.get(project.id) || project;
 }
 
