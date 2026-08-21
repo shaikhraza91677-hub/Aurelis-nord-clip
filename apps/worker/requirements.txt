@@ -4,3 +4,4 @@ faster-whisper>=1.1.0
 opencv-python-headless>=4.10.0
 indic-transliteration>=2.3.68
 redis>=6.4.0
+boto3>=1.40.0
