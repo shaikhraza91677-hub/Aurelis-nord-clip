@@ -1,4 +1,28 @@
 export type ClipCategory = 'Hook' | 'Insight' | 'Emotion' | 'Education' | 'Curiosity' | 'Quote' | 'Story' | 'Humor' | 'Other';
+export type CaptionStyle = 'Word Pop' | 'Highlight' | 'Fade' | 'Bounce';
+export type AspectRatio = '9:16' | '1:1' | '16:9';
+
+export type ClipConfig = {
+  captionStyle: CaptionStyle;
+  captionLanguage: 'auto' | 'hinglish' | 'english' | 'original';
+  aspectRatio: AspectRatio;
+  framing: 'smart' | 'center' | 'left' | 'right';
+  captionPosition: 'top' | 'center' | 'bottom';
+  captionSize: 'small' | 'medium' | 'large';
+  captionColor: string;
+  showCaptions: boolean;
+};
+
+export const defaultClipConfig: ClipConfig = {
+  captionStyle: 'Word Pop',
+  captionLanguage: 'auto',
+  aspectRatio: '9:16',
+  framing: 'smart',
+  captionPosition: 'bottom',
+  captionSize: 'medium',
+  captionColor: '#FFFFFF',
+  showCaptions: true,
+};
 
 export type Clip = {
   id: string;
@@ -12,6 +36,8 @@ export type Clip = {
   file?: string;
   captionTimeline?: string;
   language?: string;
+  framing?: { mode: string; focusX?: number };
+  config?: ClipConfig;
 };
 
 export type Project = {
@@ -26,7 +52,6 @@ export type Project = {
 };
 
 declare global {
-  // eslint-disable-next-line no-var
   var aurelisProjects: Map<string, Project> | undefined;
 }
 
