@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { projects, type Clip } from '@/lib/projects';
+import { type Clip } from '@/lib/projects';
+import { saveProject } from '@/lib/project-store';
 
 export const runtime = 'nodejs';
 
@@ -21,21 +22,19 @@ export async function POST(req: Request) {
   await writeFile(savedPath, Buffer.from(await file.arrayBuffer()));
 
   const project = { id, sourceUrl: `upload://${file.name}`, sourcePath: savedPath, customPrompt: prompt, status: 'queued' as const, progress: 0, stage: 'Queued', createdAt: new Date().toISOString(), clips: [] as Clip[] };
-  projects.set(id, project);
+  await saveProject(project);
 
   try {
     const workerUrl = process.env.WORKER_URL || 'http://localhost:8080';
-    const response = await fetch(`${workerUrl}/process-file`, {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ path: savedPath, prompt, out: process.env.WORKER_OUTPUT_DIR || './output' }), cache: 'no-store',
-    });
+    const response = await fetch(`${workerUrl}/process-file`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path: savedPath, prompt, out: process.env.WORKER_OUTPUT_DIR || './output' }), cache: 'no-store' });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || 'Media worker failed to queue the upload.');
-    projects.set(id, { ...project, jobId: result.jobId, status: 'processing', progress: 2, stage: 'Analyzing upload' });
-    return NextResponse.json(projects.get(id), { status: 202 });
+    const queued = { ...project, jobId: result.jobId, status: 'processing' as const, progress: 2, stage: 'Analyzing upload' };
+    await saveProject(queued);
+    return NextResponse.json(queued, { status: 202 });
   } catch (error) {
     const failed = { ...project, status: 'failed' as const, progress: 100, stage: 'Failed', error: error instanceof Error ? error.message : 'Processing failed.' };
-    projects.set(id, failed);
+    await saveProject(failed);
     return NextResponse.json(failed, { status: 502 });
   }
 }
