@@ -1,46 +1,4 @@
 'use client';
-
 import { FormEvent, useState } from 'react';
-
-const features = [
-  ['AI moment detection', 'Find hooks, punchlines, insights and emotional peaks instead of blindly slicing every N seconds.'],
-  ['Language-aware captions', 'Detect the spoken language. Hindi captions can be normalized into Hinglish while other languages can default to English.'],
-  ['Smart vertical framing', 'Prepare a 9:16 crop plan around the active speaker and preserve multi-person conversations.'],
-  ['Virality scoring', 'Rank candidate clips by hook strength, standalone context, payoff, pacing and shareability.'],
-  ['Caption presets', 'Word-pop, highlight, fade and bounce styles with font, size, color and position controls.'],
-  ['Ready-to-post metadata', 'Generate titles, hooks, descriptions and hashtags for each selected platform.'],
-];
-
-export default function Home() {
-  const [url, setUrl] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    setMessage('');
-    if (!url.trim()) return setMessage('Paste a video URL first.');
-    setLoading(true);
-    try {
-      const res = await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not start the project.');
-      window.location.href = `/projects/${data.id}`;
-    } catch (err) { setMessage(err instanceof Error ? err.message : 'Something went wrong.'); }
-    finally { setLoading(false); }
-  }
-
-  return <main className="shell">
-    <nav className="nav"><div className="brand">AURELIS <span>NORD</span></div><div className="navlinks"><span>How it works</span><span>Captions</span><span>Pricing</span></div><button className="secondary">Sign in</button></nav>
-    <section className="hero">
-      <span className="eyebrow">AI VIDEO REPURPOSING · BUILT FOR SHORT-FORM</span>
-      <h1>Long video in.<br/><em>Scroll-stopping clips out.</em></h1>
-      <p>Paste a YouTube link or upload your media. Aurelis finds the moments worth posting, reframes them vertically, and builds captions around every spoken word.</p>
-      <form className="ingest" onSubmit={submit}><input value={url} onChange={e=>setUrl(e.target.value)} placeholder="Paste a YouTube, Twitch, Kick or video URL…" aria-label="Video URL"/><button className="primary" disabled={loading}>{loading ? 'Analyzing…' : 'Get clips'}</button></form>
-      <div className="drop">Or upload a video file — drag & drop support is wired into the ingestion API next.</div>
-      {message && <div className="error">{message}</div>}
-      <div className="status">You control the source. Only process videos you own or have permission to repurpose.</div>
-    </section>
-    <section className="features">{features.map(([title,desc])=><article className="card" key={title}><b>{title}</b><p>{desc}</p></article>)}</section>
-  </main>;
-}
+const features=[['AI moment detection','Find hooks, punchlines, insights and emotional peaks instead of blindly slicing every N seconds.'],['Language-aware captions','Detect the spoken language. Hindi captions can be normalized into Hinglish while other languages can default to English.'],['Smart vertical framing','Prepare a 9:16 crop plan around the active speaker and preserve multi-person conversations.'],['Virality scoring','Rank candidate clips by hook strength, standalone context, payoff, pacing and shareability.'],['Caption presets','Word-pop, highlight, fade and bounce styles with font, size, color and position controls.'],['Ready-to-post metadata','Generate titles, hooks, descriptions and hashtags for each selected platform.']];
+export default function Home(){const[url,setUrl]=useState('');const[loading,setLoading]=useState(false);const[message,setMessage]=useState('');async function submit(e:FormEvent){e.preventDefault();setMessage('');if(!url.trim())return setMessage('Paste a video URL first.');setLoading(true);try{const res=await fetch('/api/projects',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});const data=await res.json();if(!res.ok)throw new Error(data.error||'Could not start the project.');window.location.href=`/projects/${data.id}?source=${encodeURIComponent(url)}`;}catch(err){setMessage(err instanceof Error?err.message:'Something went wrong.')}finally{setLoading(false)}}return <main className="shell"><nav className="nav"><div className="brand">AURELIS <span>NORD</span></div><div className="navlinks"><span>How it works</span><span>Captions</span><span>Pricing</span></div><button className="secondary">Sign in</button></nav><section className="hero"><span className="eyebrow">AI VIDEO REPURPOSING · BUILT FOR SHORT-FORM</span><h1>Long video in.<br/><em>Scroll-stopping clips out.</em></h1><p>Paste a YouTube link or upload your media. Aurelis finds the moments worth posting, reframes them vertically, and builds captions around every spoken word.</p><form className="ingest" onSubmit={submit}><input value={url} onChange={e=>setUrl(e.target.value)} placeholder="Paste a YouTube, Twitch, Kick or video URL…" aria-label="Video URL"/><button className="primary" disabled={loading}>{loading?'Analyzing…':'Get clips'}</button></form><div className="drop">Or upload a video file — drag & drop ingestion is next.</div>{message&&<div className="error">{message}</div>}<div className="status">Only process videos you own or have permission to repurpose.</div></section><section className="features">{features.map(([title,desc])=><article className="card" key={title}><b>{title}</b><p>{desc}</p></article>)}</section></main>}
