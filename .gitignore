@@ -1,0 +1,17 @@
+node_modules/
+.next/
+out/
+output/
+uploads/
+.env
+.env.*
+!.env.example
+apps/worker/.venv/
+__pycache__/
+*.py[cod]
+*.log
+.DS_Store
+.vscode/
+.idea/
+prisma/*.db
+prisma/*.db-journal
