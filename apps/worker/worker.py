@@ -1,4 +1,4 @@
-import json, os, re, subprocess, tempfile
+import json, os, re, shutil, subprocess, sys, tempfile
 from pathlib import Path
 from typing import Any
 
@@ -16,14 +16,26 @@ OPENROUTER_MODEL = os.getenv('OPENROUTER_MODEL', 'nvidia/nemotron-3-nano-omni-30
 
 
 def run(cmd: list[str]) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        return subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    except FileNotFoundError as exc:
+        executable = cmd[0] if cmd else 'command'
+        raise RuntimeError(f"Required executable '{executable}' is not installed in the worker image") from exc
 
 
 def download(url: str, out: Path) -> Path:
-    run(['yt-dlp', '--no-playlist', '-f', 'bv*+ba/b', '--merge-output-format', 'mp4', '-o', str(out / 'source.%(ext)s'), url])
+    executable = shutil.which('yt-dlp')
+    if executable:
+        cmd = [executable]
+    else:
+        # More robust in containers: pip-installed yt-dlp is also invokable as a module.
+        cmd = [sys.executable, '-m', 'yt_dlp']
+    result = run(cmd + ['--no-playlist', '-f', 'bv*+ba/b', '--merge-output-format', 'mp4', '-o', str(out / 'source.%(ext)s'), url])
     files = list(out.glob('source.*'))
     if not files:
-        raise RuntimeError('Video download completed without producing a media file')
+        stderr = result.stderr.strip()
+        detail = f' yt-dlp output: {stderr[-800:]}' if stderr else ''
+        raise RuntimeError('Video download completed without producing a media file.' + detail)
     return files[0]
 
 
@@ -115,7 +127,6 @@ def clip_focus_x(plan: dict[str, Any], start: float, end: float) -> float:
 def render(video: Path, out: Path, start: float, end: float, caption_file: Path, focus_x: float = 0.5) -> None:
     duration = max(1.0, end - start)
     safe_ass = str(caption_file.resolve()).replace('\\', '/').replace(':', '\\:')
-    # A robust baseline: letterbox-free vertical crop with the crop center biased toward the detected speaker.
     focus_expr = f"{focus_x:.4f}"
     vf = f"scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:({focus_expr}*iw)-540:0,ass='{safe_ass}'"
     run([
